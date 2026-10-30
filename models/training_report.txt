@@ -1,0 +1,40 @@
+============================================================
+NSL-KDD IDS MODEL TRAINING REPORT
+============================================================
+Generated: 2026-10-30 11:35:56
+
+Train attack ratio: 46.54%
+
+MODEL PERFORMANCE
+------------------------------------------------------------
+
+random_forest
+  Accuracy : 0.7690
+  Precision: 0.9668
+  Recall   : 0.6153
+  F1       : 0.7520
+  ROC-AUC  : 0.9694
+
+gradient_boosting
+  Accuracy : 0.7871
+  Precision: 0.9670
+  Recall   : 0.6482
+  F1       : 0.7761
+  ROC-AUC  : 0.9656
+
+svm
+  Accuracy : 0.8018
+  Precision: 0.9704
+  Recall   : 0.6723
+  F1       : 0.7943
+  ROC-AUC  : 0.8469
+
+neural_network
+  Accuracy : 0.7800
+  Precision: 0.9732
+  Recall   : 0.6310
+  F1       : 0.7656
+  ROC-AUC  : 0.9355
+
+------------------------------------------------------------
+Best model by F1: svm

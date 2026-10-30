@@ -1,0 +1,38 @@
+# Linux only: host networking lets the sensor see the host's real traffic.
+services:
+  sentinelai:
+    build: .
+    container_name: sentinelai
+    network_mode: host
+    cap_add: [NET_RAW, NET_ADMIN]
+    environment:
+      - API_KEY=${API_KEY:-}            # optional: protects the write endpoints
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+    command: ["python", "src/cli.py", "web", "--host", "127.0.0.1", "--port", "5000"]
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    network_mode: host
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:

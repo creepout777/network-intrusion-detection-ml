@@ -1,0 +1,42 @@
+{
+  "runtime": {
+    "model_path": "models/svm_model.pkl",
+    "scaler_path": "data/processed/scaler.pkl",
+    "encoders_path": "data/processed/label_encoders.pkl",
+    "alert_threshold": 0.8,
+    "attack_typing": {
+      "rules_path": "config/attack_type_rules.json",
+      "schema_path": "config/attack_type_rule_schema.json",
+      "minimum_score": 3.0,
+      "minimum_margin": 0.75,
+      "fallback_class_id": "unknown",
+      "max_alternatives": 3
+    },
+    "threat_intel": {
+      "provider": "shodan",
+      "lookup_limit": 25,
+      "cache_ttl_seconds": 900,
+      "timeout_seconds": 5,
+      "max_services_per_host": 20,
+      "max_vulns_per_host": 30,
+      "max_map_points": 250
+    }
+  },
+  "monitoring": {
+    "interface": null,
+    "packet_count": 0
+  },
+  "dashboard": {
+    "port": 8050
+  },
+  "web": {
+    "host": "127.0.0.1",
+    "port": 8050,
+    "enable_staged_data": true,
+    "refresh_interval_seconds": 2
+  },
+  "suppression": {
+    "loopback_window_seconds": 5,
+    "loopback_min_distinct_ports_for_scan": 15
+  }
+}

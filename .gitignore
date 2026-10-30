@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.DS_Store
+
+# Runtime output
+logs/
+*.log
+
+# Large intermediate files, rebuilt by src/training/preprocess.py
+data/processed/*.csv
+
+# Windows build output
+build/
+dist/
+*.spec

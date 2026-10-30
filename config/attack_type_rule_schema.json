@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "required_top_level": [
+    "schema_version",
+    "taxonomy",
+    "scoring",
+    "rules"
+  ],
+  "required_taxonomy_fields": [
+    "id",
+    "display_name",
+    "description",
+    "rich_description",
+    "limitations",
+    "required_evidence"
+  ],
+  "required_rule_fields": [
+    "id",
+    "class_id",
+    "weight",
+    "logic",
+    "conditions",
+    "evidence_id",
+    "evidence",
+    "missing_if_absent"
+  ],
+  "required_condition_fields": [
+    "metric",
+    "operator",
+    "value"
+  ],
+  "allowed_logic": [
+    "all",
+    "any"
+  ],
+  "allowed_operators": [
+    "gte",
+    "gt",
+    "lte",
+    "lt",
+    "eq",
+    "neq",
+    "in",
+    "not_in",
+    "between",
+    "contains_any",
+    "contains_all"
+  ]
+}

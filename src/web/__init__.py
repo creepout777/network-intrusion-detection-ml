@@ -1,0 +1,2 @@
+"""SentinelAI web platform package."""
+

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelAI · Enterprise SecOps</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+    <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            <div class="logo-text">SentinelAI</div>
+        </div>
+        <div class="nav-section">
+            <div class="nav-label">Analytics</div>
+            <button class="nav-item active" data-view="command-center"><i class="fa-solid fa-chart-line"></i> Command Center</button>
+            <button class="nav-item" data-view="network-graph"><i class="fa-solid fa-network-wired"></i> Network Graph</button>
+            <button class="nav-item" data-view="threat-map"><i class="fa-solid fa-globe"></i> Threat Intel</button>
+
+            <div class="nav-label section-break">Operations</div>
+            <button class="nav-item" data-view="active-incidents"><i class="fa-solid fa-triangle-exclamation"></i> Active Incidents</button>
+            <button class="nav-item" data-view="threat-hunting"><i class="fa-solid fa-magnifying-glass-chart"></i> Threat Hunting</button>
+            <button class="nav-item" data-view="compliance-logs"><i class="fa-solid fa-book-journal-whills"></i> Compliance Logs</button>
+
+            <div class="nav-label section-break">Configuration</div>
+            <button class="nav-item" data-view="detection-rules"><i class="fa-solid fa-sliders"></i> Detection Rules</button>
+            <button class="nav-item" data-view="sensor-nodes"><i class="fa-solid fa-server"></i> Sensor Nodes</button>
+            <button class="nav-item" data-view="settings"><i class="fa-solid fa-gear"></i> Settings</button>
+        </div>
+    </aside>
+
+    <main class="main-wrapper">
+        <header class="topbar">
+            <div class="search-bar">
+                <i class="fa-solid fa-search"></i>
+                <input type="text" placeholder="Search incidents, IPs, classifiers..." id="globalSearch">
+            </div>
+            <div class="topbar-actions">
+                <div class="clock" id="sysClock">00:00:00 UTC</div>
+                <button class="btn btn-primary" id="refreshNow"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <section class="view active" data-view="command-center">
+                <div class="page-header">
+                    <div>
+                        <h2>Command Center</h2>
+                        <p>Live telemetry and intrusion detection overview</p>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="card"><div class="card-title">Events Processed</div><div class="kpi-val" id="kpi-events">0</div></div>
+                    <div class="card"><div class="card-title">Threats Blocked</div><div class="kpi-val brand" id="kpi-threats">0</div></div>
+                    <div class="card"><div class="card-title">Active Critical Incidents</div><div class="kpi-val danger" id="kpi-critical">0</div></div>
+                    <div class="card"><div class="card-title">AI Confidence Score</div><div class="kpi-val success" id="kpi-confidence">0%</div></div>
+                </div>
+
+                <div class="card simulation-panel">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Simulation Control Panel</div>
+                            <div class="simulation-panel-subtitle">Trigger backend attack scenarios to refresh live telemetry</div>
+                        </div>
+                    </div>
+                    <div class="simulation-buttons" id="simulationScenarioButtons">
+                        <div class="simulation-empty">Loading simulation scenarios...</div>
+                    </div>
+                    <div class="status-msg" id="simulationStatus"></div>
+                </div>
+
+                <div class="card attack-observability-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Attack Typing Observability</div>
+                            <div class="attack-observability-subtitle" id="attackObsSubtitle">Waiting for incident telemetry...</div>
+                        </div>
+                    </div>
+                    <div class="attack-observability-grid">
+                        <div class="attack-observability-metric">
+                            <div class="attack-observability-label">Fallback field usage</div>
+                            <div class="attack-observability-value" id="attackObsFallbackRate">--</div>
+                            <div class="attack-observability-detail" id="attackObsFallbackCount">0 / 0 incidents</div>
+                        </div>
+                        <div class="attack-observability-metric">
+                            <div class="attack-observability-label">Low-confidence field usage</div>
+                            <div class="attack-observability-value" id="attackObsLowConfidenceRate">--</div>
+                            <div class="attack-observability-detail" id="attackObsLowConfidenceCount">0 / 0 incidents</div>
+                        </div>
+                        <div class="attack-observability-metric">
+                            <div class="attack-observability-label">Gate failure rate</div>
+                            <div class="attack-observability-value" id="attackObsGateFailureRate">--</div>
+                            <div class="attack-observability-detail" id="attackObsGateFailureCount">0 / 0 scored</div>
+                        </div>
+                        <div class="attack-observability-metric">
+                            <div class="attack-observability-label">Rule hit rate</div>
+                            <div class="attack-observability-value" id="attackObsRuleHitRate">--</div>
+                            <div class="attack-observability-detail" id="attackObsRuleHitCount">0 / 0 scored</div>
+                        </div>
+                        <div class="attack-observability-metric">
+                            <div class="attack-observability-label">Gate pass rate</div>
+                            <div class="attack-observability-value" id="attackObsGatePassRate">--</div>
+                            <div class="attack-observability-detail" id="attackObsGatePassCount">0 / 0 scored</div>
+                        </div>
+                    </div>
+                    <div class="attack-observability-breakdown">
+                        <div class="attack-observability-detail"><span class="attack-observability-key">Top fallback fields:</span> <span id="attackObsFallbackFields">--</span></div>
+                        <div class="attack-observability-detail"><span class="attack-observability-key">Top low-confidence fields:</span> <span id="attackObsLowConfidenceFields">--</span></div>
+                        <div class="attack-observability-detail"><span class="attack-observability-key">Gate failures:</span> <span id="attackObsGateFailureBreakdown">--</span></div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Network Ingress vs Anomaly Detection</div></div>
+                        <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Threat Vector Signature</div></div>
+                        <div class="chart-wrap"><canvas id="radarChart"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="bottom-grid">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Actionable Incidents</div></div>
+                        <table>
+                            <thead><tr><th>ID</th><th>Timestamp</th><th>Source</th><th>Classification</th><th>Description</th><th>Severity (Detection)</th></tr></thead>
+                            <tbody id="incidentRows"></tbody>
+                        </table>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Top Targeted Endpoints</div></div>
+                        <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" data-view="network-graph">
+                <div class="page-header"><div><h2>Network Graph</h2><p>Live attacker/target relationship graph data</p></div></div>
+                <div class="card network-graph-visual-card">
+                    <div class="card-header">
+                        <div class="card-title">Interactive Topology</div>
+                        <div class="graph-controls">
+                            <button class="btn" id="networkGraphFit" type="button"><i class="fa-solid fa-expand"></i> Fit</button>
+                            <button class="btn" id="networkGraphPhysicsToggle" type="button"><i class="fa-solid fa-circle-pause"></i> Pause Physics</button>
+                        </div>
+                    </div>
+                    <div id="networkGraphCanvas" class="graph-canvas" role="img" aria-label="Network relationship graph"></div>
+                    <div class="status-msg network-graph-status" id="networkGraphStatus"></div>
+                    <div class="detail-text network-graph-selection" id="networkGraphSelection">Select a node or edge to inspect relationship details.</div>
+                </div>
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Nodes</div></div>
+                        <table><thead><tr><th>IP</th><th>Role</th><th>Primary Attack</th><th>Avg Attack Confidence</th><th>Uncertainty</th></tr></thead><tbody id="networkNodesRows"></tbody></table>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Edges</div></div>
+                        <table><thead><tr><th>Source</th><th>Target</th><th>Weight</th><th>Primary Attack</th><th>Avg Attack Confidence</th><th>Uncertainty</th></tr></thead><tbody id="networkEdgesRows"></tbody></table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="view" data-view="threat-map">
+                <div class="page-header"><div><h2>Threat Intel</h2><p>IP enrichment and external intelligence for incident endpoints</p></div></div>
+                <div class="detail-text semantics-note">Risk (Threat Intel) reflects external exposure posture (CVEs/services/ports). It is separate from Severity (Detection), which reflects detection urgency in incident views.</div>
+                <div class="kpi-grid threat-intel-kpi-grid">
+                    <div class="card"><div class="card-title">Unique Intel IPs</div><div class="kpi-val" id="tiKpiUniqueIps">0</div></div>
+                    <div class="card"><div class="card-title">Public IPs</div><div class="kpi-val brand" id="tiKpiPublicIps">0</div></div>
+                    <div class="card"><div class="card-title">IPs With Vulnerabilities</div><div class="kpi-val danger" id="tiKpiVulns">0</div></div>
+                    <div class="card"><div class="card-title">Shodan Hits</div><div class="kpi-val success" id="tiKpiShodanHits">0</div></div>
+                </div>
+                <div class="two-col">
+                    <div class="card threat-intel-map-card">
+                        <div class="card-header">
+                            <div class="card-title">Global Exposure Map</div>
+                            <div class="graph-controls threat-intel-map-controls">
+                                <button class="btn" id="threatIntelMapFit" type="button"><i class="fa-solid fa-expand"></i> Fit</button>
+                                <button class="btn" id="threatIntelMapReset" type="button"><i class="fa-solid fa-house"></i> Reset</button>
+                                <button class="btn" id="threatIntelMapFocusSelected" type="button"><i class="fa-solid fa-crosshairs"></i> Focus selected</button>
+                            </div>
+                        </div>
+                        <div id="threatIntelMapCanvas" class="threat-intel-map-canvas" role="img" aria-label="Threat intel geolocation map"></div>
+                        <div class="threat-intel-map-legend">
+                            <span><i class="legend-dot legend-dot-high"></i>High risk</span>
+                            <span><i class="legend-dot legend-dot-medium"></i>Medium risk</span>
+                            <span><i class="legend-dot legend-dot-low"></i>Low risk</span>
+                        </div>
+                        <div class="status-msg threat-intel-map-status" id="threatIntelMapStatus"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Risk Distribution</div></div>
+                        <div class="chart-wrap"><canvas id="threatIntelRiskChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Top Countries</div></div>
+                        <div class="chart-wrap"><canvas id="threatIntelCountryChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Top Exposed Ports</div></div>
+                        <div class="chart-wrap"><canvas id="threatIntelPortChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Vulnerability Severity</div></div>
+                        <div class="chart-wrap"><canvas id="threatIntelVulnChart"></canvas></div>
+                    </div>
+                    <div class="card threat-intel-detail-card">
+                        <div class="card-header"><div class="card-title">Selected Finding</div></div>
+                        <div class="detail-text" id="threatIntelDetailSummary">Select a Threat Intel row to inspect service and CVE detail.</div>
+                        <div class="label">Service Fingerprints</div>
+                        <ul id="threatIntelServiceList" class="list compact-list">
+                            <li class="list-empty">No service details selected</li>
+                        </ul>
+                        <div class="label">Top CVEs</div>
+                        <ul id="threatIntelVulnList" class="list compact-list">
+                            <li class="list-empty">No CVE details selected</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card">
+                    <table><thead><tr><th>Incident</th><th>IP</th><th>Role</th><th>Provider</th><th>Org / ASN</th><th>Geo</th><th>Services</th><th>Vulns</th><th>Risk (Threat Intel)</th><th>Updated</th></tr></thead><tbody id="threatMapRows"></tbody></table>
+                </div>
+            </section>
+
+            <section class="view" data-view="active-incidents">
+                <div class="page-header">
+                    <div><h2>Active Incidents</h2><p>Current detection backlog. Severity here is detection urgency (not threat-intel exposure risk).</p></div>
+                    <div class="page-header-actions">
+                        <button class="btn" id="exportIncidentsCsv" type="button"><i class="fa-solid fa-download"></i> Export CSV</button>
+                        <div class="status-msg" id="incidentTriageStatus"></div>
+                        <div class="status-msg" id="incidentExportStatus"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <table><thead><tr><th>ID</th><th>Timestamp</th><th>Attacker</th><th>Target</th><th>Class / Typing</th><th>Severity (Detection)</th><th>Attack Confidence</th><th>Triage</th></tr></thead><tbody id="activeIncidentsRows"></tbody></table>
+                </div>
+            </section>
+
+            <section class="view" data-view="threat-hunting">
+                <div class="page-header">
+                    <div>
+                        <h2>Threat Hunting</h2>
+                        <p>Pivot-ready leads and query workspace. Severity remains detection urgency and is distinct from threat-intel risk.</p>
+                    </div>
+                    <div class="page-header-actions">
+                        <div class="status-msg" id="huntingQueryStatus"></div>
+                    </div>
+                </div>
+                <div class="card hunting-workspace-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Hunting Query Console</div>
+                            <div class="cell-meta" id="huntingCapabilitiesSummary">Loading query capabilities...</div>
+                        </div>
+                    </div>
+                    <label class="hunting-field hunting-console-input">DSL query (Ctrl/Cmd + Enter to run)
+                        <textarea id="huntingDslInput" rows="10" placeholder="attack_confidence >= 0.85 and attack_certainty_level in (probable,certain)"></textarea>
+                    </label>
+                    <div class="hunting-console-controls">
+                        <div class="hunting-query-actions">
+                            <button class="btn btn-primary" id="huntingRunQuery" type="button"><i class="fa-solid fa-play"></i> Run Query</button>
+                            <button class="btn" id="huntingResetQuery" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+                        </div>
+                        <div class="hunting-mini-controls">
+                            <label class="hunting-field hunting-mini-field">Result limit
+                                <input type="number" id="huntingFilterLimit" min="1" max="1000" step="1">
+                            </label>
+                            <label class="hunting-field hunting-mini-field">Offset
+                                <input type="number" id="huntingFilterOffset" min="0" max="2000" step="1">
+                            </label>
+                            <label class="hunting-field hunting-mini-field">Scan limit
+                                <input type="number" id="huntingFilterScanLimit" min="1" max="2000" step="1">
+                            </label>
+                            <label class="hunting-field hunting-mini-field">Scientific max incidents
+                                <input type="number" id="huntingScientificMaxIncidents" min="50" max="2000" step="1">
+                            </label>
+                        </div>
+                    </div>
+                    <details class="hunting-advanced-filters">
+                        <summary>Advanced filters</summary>
+                        <div class="hunting-workspace-grid">
+                        <div class="hunting-filter-grid">
+                            <label class="hunting-field">Source IPs (comma/newline separated)
+                                <textarea id="huntingFilterSourceIps" rows="2" placeholder="192.168.1.10, 10.0.0.5"></textarea>
+                            </label>
+                            <label class="hunting-field">Target IPs
+                                <textarea id="huntingFilterTargetIps" rows="2" placeholder="172.16.0.11"></textarea>
+                            </label>
+                            <label class="hunting-field">Attack classes
+                                <textarea id="huntingFilterAttackClasses" rows="2" placeholder="Port Scan, DDoS"></textarea>
+                            </label>
+                            <label class="hunting-field">Severity (Detection)
+                                <select id="huntingFilterSeverities" multiple></select>
+                            </label>
+                            <label class="hunting-field">Certainty levels
+                                <select id="huntingFilterCertaintyLevels" multiple></select>
+                            </label>
+                            <label class="hunting-field">Triage states
+                                <select id="huntingFilterTriageStates" multiple></select>
+                            </label>
+                            <label class="hunting-field">Attack confidence min
+                                <input type="number" id="huntingFilterAttackConfidenceGte" min="0" max="1" step="0.01" placeholder="0.85">
+                            </label>
+                            <label class="hunting-field">Attack confidence max
+                                <input type="number" id="huntingFilterAttackConfidenceLte" min="0" max="1" step="0.01">
+                            </label>
+                            <label class="hunting-field">Detection confidence min
+                                <input type="number" id="huntingFilterDetectionConfidenceGte" min="0" max="1" step="0.01">
+                            </label>
+                            <label class="hunting-field">Detection confidence max
+                                <input type="number" id="huntingFilterDetectionConfidenceLte" min="0" max="1" step="0.01">
+                            </label>
+                            <label class="hunting-field">Event count min
+                                <input type="number" id="huntingFilterEventCountGte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">Event count max
+                                <input type="number" id="huntingFilterEventCountLte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">Bytes min
+                                <input type="number" id="huntingFilterBytesGte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">Bytes max
+                                <input type="number" id="huntingFilterBytesLte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">Packets min
+                                <input type="number" id="huntingFilterPacketsGte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">Packets max
+                                <input type="number" id="huntingFilterPacketsLte" min="0" step="1">
+                            </label>
+                            <label class="hunting-field">From timestamp
+                                <input type="datetime-local" id="huntingFilterFromTimestamp">
+                            </label>
+                            <label class="hunting-field">To timestamp
+                                <input type="datetime-local" id="huntingFilterToTimestamp">
+                            </label>
+                            <label class="hunting-field">Text contains
+                                <input type="text" id="huntingFilterTextContains" placeholder="evidence, summary, IP, class...">
+                            </label>
+                        </div>
+                        <div class="hunting-query-panel">
+                            <div class="label">Scientific methods</div>
+                            <div class="hunting-check-grid" id="huntingScientificMethods"></div>
+                        </div>
+                    </div>
+                    </details>
+                </div>
+                <div class="hunting-visual-grid">
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Query Severity Distribution (Detection)</div></div>
+                        <div class="chart-wrap"><canvas id="huntingSeverityChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Attack Certainty Mix</div></div>
+                        <div class="chart-wrap"><canvas id="huntingCertaintyChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Top Query Sources</div></div>
+                        <div class="chart-wrap"><canvas id="huntingTopSourcesChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><div class="card-title">Scientific Method Signals</div></div>
+                        <div class="detail-text" id="huntingScientificSummary">Run a query to evaluate scientific-method heuristics.</div>
+                        <ul id="huntingScientificSignals" class="list compact-list">
+                            <li class="list-empty">No scientific signals yet.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="card hunting-results-card" id="huntingQueryResultsCard">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Query Results</div>
+                            <div class="cell-meta" id="huntingQueryResultSummary">Run a query to inspect filtered hunting results and analytics.</div>
+                        </div>
+                    <div class="hunting-results-header-meta">
+                            <div class="status-msg hunting-results-state" id="huntingQueryResultState" aria-live="polite">
+                                Results appear here after you run a hunting query.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hunting-results-banner">Results console output appears in the table below.</div>
+                    <div class="hunting-query-results-table-wrap">
+                        <table><thead><tr><th>Incident</th><th>Timestamp</th><th>Source</th><th>Target</th><th>Attack Family</th><th>Severity (Detection)</th><th>Attack Confidence</th><th>Certainty</th><th>Triage</th></tr></thead><tbody id="huntingQueryRows"><tr><td colspan="9">Run a query to populate the workspace.</td></tr></tbody></table>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><div class="card-title">Hot Sources</div></div>
+                    <table><thead><tr><th>Source IP</th><th>Incident Count</th><th>Primary Attack</th><th>Avg Attack Confidence</th><th>Uncertainty</th></tr></thead><tbody id="hotSourcesRows"></tbody></table>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">High Confidence Findings</div>
+                            <div class="cell-meta" id="highConfidenceFindingsSummary">Loading...</div>
+                        </div>
+                    </div>
+                    <table><thead><tr><th>Incident</th><th>Timestamp</th><th>Source</th><th>Target</th><th>Attack Family</th><th>Severity (Detection)</th><th>Attack Confidence</th></tr></thead><tbody id="highConfidenceFindingsRows"></tbody></table>
+                </div>
+            </section>
+
+            <section class="view" data-view="compliance-logs">
+                <div class="page-header"><div><h2>Compliance Logs</h2><p>Tail of runtime IDS log stream</p></div></div>
+                <div class="card"><pre id="complianceLogBody" class="code-block">Loading logs...</pre></div>
+            </section>
+
+            <section class="view" data-view="detection-rules">
+                <div class="page-header"><div><h2>Detection Rules</h2><p>Tune detection and suppression thresholds</p></div></div>
+                <div class="card form-card">
+                    <label>Alert threshold (0.0 - 1.0)<input type="number" id="ruleThreshold" min="0" max="1" step="0.01"></label>
+                    <label>Loopback window seconds<input type="number" id="ruleLoopWindow" min="1" step="1"></label>
+                    <label>Loopback min distinct ports for scan<input type="number" id="ruleLoopPorts" min="1" step="1"></label>
+                    <label>Attack typing minimum score<input type="number" id="ruleAttackMinScore" min="0" step="0.1"></label>
+                    <label>Attack typing minimum margin<input type="number" id="ruleAttackMinMargin" min="0" step="0.05"></label>
+                    <label>Attack typing fallback class id<input type="text" id="ruleAttackFallbackClass"></label>
+                    <label>Attack typing max alternatives<input type="number" id="ruleAttackMaxAlternatives" min="1" step="1"></label>
+                    <button class="btn btn-primary" id="saveRules">Save Rules</button>
+                    <div class="status-msg" id="rulesStatus"></div>
+                </div>
+            </section>
+
+            <section class="view" data-view="sensor-nodes">
+                <div class="page-header"><div><h2>Sensor Nodes</h2><p>Capture interfaces and status</p></div></div>
+                <div class="card">
+                    <table><thead><tr><th>Sensor</th><th>Interface</th><th>Status</th><th>Packets</th></tr></thead><tbody id="sensorRows"></tbody></table>
+                </div>
+            </section>
+
+            <section class="view" data-view="settings">
+                <div class="page-header"><div><h2>Settings</h2><p>Web runtime behavior configuration</p></div></div>
+                <div class="card form-card">
+                    <label>Host<input type="text" id="settingHost" readonly></label>
+                    <label>Port<input type="number" id="settingPort" readonly></label>
+                    <label>Refresh interval seconds<input type="number" id="settingRefresh" min="1" step="1"></label>
+                    <label class="checkbox"><input type="checkbox" id="settingStaged"> Enable staged/simulated data where live data is unavailable</label>
+                    <button class="btn btn-primary" id="saveSettings">Save Settings</button>
+                    <div class="status-msg" id="settingsStatus"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <div class="modal-overlay" id="appModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modTitle">Incident Details</h3>
+                    <span class="tag" id="modSev">N/A</span>
+                </div>
+                <button class="modal-close" id="modalClose"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+                <div class="modal-body">
+                    <div class="modal-grid">
+                        <div><div class="label">Attacker IP</div><div class="mono" id="modIp">--</div></div>
+                        <div><div class="label">Targets</div><div class="mono" id="modTarget">--</div></div>
+                    </div>
+                    <div class="modal-grid">
+                        <div><div class="label">Primary Attack Type</div><div class="detail-text mono" id="modPrimaryClass">Unknown / Needs More Data</div></div>
+                        <div><div class="label">Primary Type Confidence</div><div class="detail-text mono" id="modPrimaryConfidence">--</div></div>
+                    </div>
+                    <div class="label-row">
+                        <div class="label">Attack Description</div>
+                        <div class="description-toggle" id="modDescriptionToggle" role="tablist" aria-label="Attack description view mode">
+                            <button class="description-toggle-btn active" type="button" data-description-mode="brief" aria-pressed="true">Brief</button>
+                            <button class="description-toggle-btn" type="button" data-description-mode="full" aria-pressed="false">Full</button>
+                        </div>
+                    </div>
+                    <div class="detail-text" id="modDescription">No description available</div>
+                    <div class="label">Detection Method / Source</div>
+                    <div class="detail-text" id="modMethod">No detection method details available</div>
+                    <div class="label">Alternative Classes</div>
+                    <ul class="list modal-list compact-list" id="modAlternatives"><li class="list-empty">No alternatives reported</li></ul>
+                    <div class="modal-grid">
+                        <div>
+                            <div class="label">Evidence Used</div>
+                            <ul class="list modal-list compact-list" id="modEvidenceUsed"><li class="list-empty">No supporting evidence reported</li></ul>
+                        </div>
+                        <div>
+                            <div class="label">Missing Evidence</div>
+                            <ul class="list modal-list compact-list" id="modEvidenceMissing"><li class="list-empty">No missing evidence reported</li></ul>
+                        </div>
+                    </div>
+                    <div class="label">Limitations</div>
+                    <ul class="list modal-list compact-list" id="modLimitations"><li class="list-empty">No model limitations reported</li></ul>
+                    <div class="label">Uncertainty Notes</div>
+                    <div class="detail-text" id="modUncertaintyNote">No additional uncertainty notes provided</div>
+                    <div class="label">Detection Rationale</div>
+                    <ul class="list modal-list" id="modRationale"><li>No rationale available</li></ul>
+                    <div class="label">Payload Preview</div>
+                    <pre class="code-block" id="modCode">No payload preview</pre>
+                </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

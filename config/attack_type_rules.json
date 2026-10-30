@@ -1,0 +1,391 @@
+{
+  "schema_version": "1.0",
+  "taxonomy": [
+    {
+      "id": "port-scan",
+      "display_name": "Port Scan",
+      "description": "Reconnaissance traffic probing multiple destination ports.",
+      "rich_description": "The source appears to be enumerating reachable services by probing many destination ports over a short period. This pattern is commonly associated with network reconnaissance and pre-exploitation mapping.",
+      "limitations": [
+        "A small number of events can look like normal service discovery.",
+        "NAT/proxy traffic can blend many clients into one source identity."
+      ],
+      "required_evidence": [
+        "scan-multi-port"
+      ],
+      "certainty_evidence": [
+        "scan-multi-port",
+        "scan-target-spread"
+      ]
+    },
+    {
+      "id": "ssh-bruteforce",
+      "display_name": "SSH Brute Force",
+      "description": "Repeated suspicious activity targeting SSH service.",
+      "rich_description": "The alert stream repeatedly targets SSH endpoints (port 22), consistent with credential-guessing or automated login attempts. Correlated event volume increases confidence in a brute-force interpretation.",
+      "limitations": [
+        "Legitimate automation can generate repeated SSH activity.",
+        "Encrypted SSH traffic prevents payload-level verification."
+      ],
+      "required_evidence": [
+        "ssh-port-targeted"
+      ],
+      "certainty_evidence": [
+        "ssh-port-targeted",
+        "ssh-repeat-events"
+      ]
+    },
+    {
+      "id": "web-payload-injection",
+      "display_name": "Web Payload Injection",
+      "description": "Suspicious activity targeting web-facing services.",
+      "rich_description": "Traffic is concentrated on web service ports and shows event characteristics often seen in injection or exploit-delivery attempts. This indicates possible probing or payload delivery against HTTP(S) applications.",
+      "limitations": [
+        "No HTTP payload parsing is performed in this classifier.",
+        "Legitimate API traffic bursts may resemble attack traffic."
+      ],
+      "required_evidence": [
+        "web-port-targeted"
+      ],
+      "certainty_evidence": [
+        "web-port-targeted",
+        "web-event-cluster"
+      ]
+    },
+    {
+      "id": "udp-flood",
+      "display_name": "UDP Flood Pattern",
+      "description": "High-volume suspicious UDP activity.",
+      "rich_description": "The event pattern is predominantly UDP with elevated packet volume/rate, consistent with volumetric flooding or amplification-style behavior aimed at service degradation.",
+      "limitations": [
+        "High-throughput media or telemetry can also use UDP heavily.",
+        "This logic does not verify reflection/amplification protocol specifics."
+      ],
+      "required_evidence": [
+        "udp-traffic"
+      ],
+      "certainty_evidence": [
+        "udp-traffic",
+        "udp-packet-volume",
+        "udp-rate-spike"
+      ]
+    },
+    {
+      "id": "unknown",
+      "display_name": "Unknown / Needs More Data",
+      "description": "Insufficient or ambiguous evidence for attack-family assignment.",
+      "rich_description": "The ML detector signaled attack-like behavior, but deterministic attack-family rules did not have enough unambiguous evidence to assign a specific class safely. Additional correlated events or richer protocol evidence are required.",
+      "limitations": [
+        "Attack-family assignment requires stronger supporting context than attack detection.",
+        "Rules are deterministic and intentionally conservative."
+      ],
+      "required_evidence": [],
+      "certainty_evidence": []
+    }
+  ],
+  "scoring": {
+    "minimum_score": 3.0,
+    "minimum_margin": 0.75,
+    "fallback_class_id": "unknown",
+    "max_alternatives": 3
+  },
+  "rules": [
+    {
+      "id": "rule-scan-multi-port",
+      "class_id": "port-scan",
+      "weight": 3.0,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "distinct_target_ports",
+          "operator": "gte",
+          "value": 15
+        }
+      ],
+      "evidence_id": "scan-multi-port",
+      "evidence": "High port spread observed (>= 15 distinct target ports).",
+      "missing_if_absent": "Need broader destination-port spread to confirm scan behavior."
+    },
+    {
+      "id": "rule-scan-event-burst",
+      "class_id": "port-scan",
+      "weight": 1.2,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 3
+        }
+      ],
+      "evidence_id": "scan-event-burst",
+      "evidence": "Multiple correlated events support scanning persistence.",
+      "missing_if_absent": "Need repeated correlated events to strengthen scanning confidence."
+    },
+    {
+      "id": "rule-scan-target-spread",
+      "class_id": "port-scan",
+      "weight": 1.0,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "distinct_target_ips",
+          "operator": "gte",
+          "value": 2
+        }
+      ],
+      "evidence_id": "scan-target-spread",
+      "evidence": "Probe behavior spans more than one destination IP.",
+      "missing_if_absent": "Target distribution is narrow; scan intent is less certain."
+    },
+    {
+      "id": "rule-ssh-port-targeted",
+      "class_id": "ssh-bruteforce",
+      "weight": 2.4,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "target_ports",
+          "operator": "contains_any",
+          "value": [
+            22
+          ]
+        }
+      ],
+      "evidence_id": "ssh-port-targeted",
+      "evidence": "SSH service (port 22) is directly targeted.",
+      "missing_if_absent": "Need direct SSH targeting evidence (port 22)."
+    },
+    {
+      "id": "rule-ssh-repeat-events",
+      "class_id": "ssh-bruteforce",
+      "weight": 1.3,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 4
+        }
+      ],
+      "evidence_id": "ssh-repeat-events",
+      "evidence": "Repeated events match iterative login-attempt behavior.",
+      "missing_if_absent": "Need more repeated SSH-targeted events to confirm brute force."
+    },
+    {
+      "id": "rule-ssh-low-bytes",
+      "class_id": "ssh-bruteforce",
+      "weight": 0.8,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "bytes_per_packet",
+          "operator": "lte",
+          "value": 220
+        }
+      ],
+      "evidence_id": "ssh-low-bytes",
+      "evidence": "Packet size profile aligns with repeated auth attempts.",
+      "missing_if_absent": "Payload-size profile is not typical of credential guessing."
+    },
+    {
+      "id": "rule-web-port-targeted",
+      "class_id": "web-payload-injection",
+      "weight": 2.2,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "target_ports",
+          "operator": "contains_any",
+          "value": [
+            80,
+            443,
+            8080
+          ]
+        }
+      ],
+      "evidence_id": "web-port-targeted",
+      "evidence": "Traffic directly targets common web service ports.",
+      "missing_if_absent": "Need web-service targeting evidence (80/443/8080)."
+    },
+    {
+      "id": "rule-web-event-cluster",
+      "class_id": "web-payload-injection",
+      "weight": 1.0,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 2
+        }
+      ],
+      "evidence_id": "web-event-cluster",
+      "evidence": "Correlated event cluster indicates sustained web probing.",
+      "missing_if_absent": "Need more than one correlated web-targeting event."
+    },
+    {
+      "id": "rule-web-large-payloads",
+      "class_id": "web-payload-injection",
+      "weight": 1.3,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "bytes_per_packet",
+          "operator": "gte",
+          "value": 180
+        }
+      ],
+      "evidence_id": "web-large-payloads",
+      "evidence": "Larger packet profile is compatible with payload delivery attempts.",
+      "missing_if_absent": "Observed packet profile is too light for payload-heavy requests."
+    },
+    {
+      "id": "rule-udp-traffic",
+      "class_id": "udp-flood",
+      "weight": 2.3,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "protocol",
+          "operator": "eq",
+          "value": 17
+        }
+      ],
+      "evidence_id": "udp-traffic",
+      "evidence": "Traffic is predominantly UDP.",
+      "missing_if_absent": "Need protocol evidence for UDP-dominant behavior."
+    },
+    {
+      "id": "rule-udp-packet-volume",
+      "class_id": "udp-flood",
+      "weight": 1.7,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "packets",
+          "operator": "gte",
+          "value": 30
+        }
+      ],
+      "evidence_id": "udp-packet-volume",
+      "evidence": "Packet volume is elevated for a single grouped alert.",
+      "missing_if_absent": "Need higher packet volume to support flood interpretation."
+    },
+    {
+      "id": "rule-udp-rate-spike",
+      "class_id": "udp-flood",
+      "weight": 1.2,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "packets_per_event",
+          "operator": "gte",
+          "value": 12
+        }
+      ],
+      "evidence_id": "udp-rate-spike",
+      "evidence": "Per-event packet rate indicates possible flooding pressure.",
+      "missing_if_absent": "Need stronger packet-rate concentration to indicate flooding."
+    },
+    {
+      "id": "rule-scan-temporal-burst",
+      "class_id": "port-scan",
+      "weight": 0.9,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 3
+        },
+        {
+          "metric": "events_per_minute",
+          "operator": "gte",
+          "value": 12
+        },
+        {
+          "metric": "dominant_target_port_event_ratio",
+          "operator": "lte",
+          "value": 0.45
+        }
+      ],
+      "evidence_id": "scan-temporal-burst",
+      "evidence": "Temporal burst pattern shows fast multi-port probing behavior.",
+      "missing_if_absent": "Need denser, distributed event timing to confirm active scanning cadence."
+    },
+    {
+      "id": "rule-ssh-focused-attempt-rate",
+      "class_id": "ssh-bruteforce",
+      "weight": 1.0,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 2
+        },
+        {
+          "metric": "events_per_minute",
+          "operator": "gte",
+          "value": 4
+        },
+        {
+          "metric": "dominant_target_port_event_ratio",
+          "operator": "gte",
+          "value": 0.8
+        },
+        {
+          "metric": "ssh_target_port_ratio",
+          "operator": "gte",
+          "value": 0.8
+        }
+      ],
+      "evidence_id": "ssh-focused-attempt-rate",
+      "evidence": "Temporal concentration on SSH-focused events supports brute-force automation.",
+      "missing_if_absent": "Need concentrated repeated SSH-focused event timing to strengthen brute-force evidence."
+    },
+    {
+      "id": "rule-web-focused-service-targeting",
+      "class_id": "web-payload-injection",
+      "weight": 0.9,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 2
+        },
+        {
+          "metric": "web_target_port_ratio",
+          "operator": "gte",
+          "value": 0.5
+        }
+      ],
+      "evidence_id": "web-focused-service-targeting",
+      "evidence": "Most targeted services in this group are web-facing ports.",
+      "missing_if_absent": "Need stronger concentration on web-facing service ports."
+    },
+    {
+      "id": "rule-udp-event-consistency",
+      "class_id": "udp-flood",
+      "weight": 0.9,
+      "logic": "all",
+      "conditions": [
+        {
+          "metric": "event_count",
+          "operator": "gte",
+          "value": 3
+        },
+        {
+          "metric": "udp_event_ratio",
+          "operator": "gte",
+          "value": 0.8
+        }
+      ],
+      "evidence_id": "udp-event-consistency",
+      "evidence": "Grouped events consistently remain UDP-dominant over time.",
+      "missing_if_absent": "Need sustained UDP dominance across grouped events."
+    }
+  ]
+}
